@@ -26,7 +26,8 @@
     "react-dom": "^18.3.1",
     "react-zoom-pan-pinch": "^3.6.1",
     "tailwind-merge": "^2.5.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "vite-plugin-pwa": "^0.20.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",

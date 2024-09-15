@@ -19,6 +19,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Cloud, Filter, Tag, Download, Grid, Image as ImageIcon, LogIn, ZoomIn, ZoomOut, Maximize, Minimize, Moon, Sun } from 'lucide-react'
 import { useTheme } from "next-themes"
+import CloudStorageDialog from './CloudStorageDialog'
 
 // Updated mock data with real image URLs
 const mockImages = [
@@ -197,52 +198,7 @@ export function FocalPoint() {
           <Button variant="outline" size="icon" onClick={toggleTheme}>
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Cloud className="mr-2 h-4 w-4" />
-                Cloud Storage
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-background text-foreground">
-              <DialogHeader>
-                <DialogTitle>Connect to Cloud Storage</DialogTitle>
-                <DialogDescription>
-                  Choose a cloud provider and enter your connection details.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="cloudProvider" className="text-right">
-                    Provider
-                  </Label>
-                  <select
-                    id="cloudProvider"
-                    className="col-span-3"
-                    value={cloudProvider || ""}
-                    onChange={(e) => setCloudProvider(e.target.value)}
-                  >
-                    <option value="">Select a provider</option>
-                    <option value="azure">Azure Blob Storage</option>
-                    <option value="aws">Amazon S3</option>
-                    <option value="gcp">Google Cloud Storage</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="connectionString" className="text-right">
-                    Connection String
-                  </Label>
-                  <Input
-                    id="connectionString"
-                    value={connectionString}
-                    onChange={(e) => setConnectionString(e.target.value)}
-                    className="col-span-3"
-                  />
-                </div>
-              </div>
-              <Button onClick={handleCloudConnect}>Connect</Button>
-            </DialogContent>
-          </Dialog>
+          <CloudStorageDialog/>
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline">
