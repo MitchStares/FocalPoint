@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch"
 import { Cloud, Filter, Tag, Download, Grid, Image as ImageIcon, LogIn, ZoomIn, ZoomOut, Maximize, Minimize, Moon, Sun } from 'lucide-react'
 import { useTheme } from "next-themes"
 import CloudStorageDialog from './CloudStorageDialog'
+import { LoginComponent } from './LoginComponent'
 
 // Updated mock data with real image URLs
 const mockImages = [
@@ -40,11 +41,6 @@ export function FocalPoint() {
   const [selectedImages, setSelectedImages] = useState<number[]>([])
   const [bulkTag, setBulkTag] = useState("")
   const [viewMode, setViewMode] = useState<'single' | 'grid'>('single')
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [cloudProvider, setCloudProvider] = useState<string | null>(null)
-  const [connectionString, setConnectionString] = useState("")
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [advancedFilters, setAdvancedFilters] = useState({
     dateRange: [new Date().toISOString().split('T')[0], new Date().toISOString().split('T')[0]],
@@ -151,26 +147,6 @@ export function FocalPoint() {
     downloadAnchorNode.remove()
   }
 
-  const handleLogin = () => {
-    // In a real application, you would validate credentials here
-    if (username && password) {
-      setIsLoggedIn(true)
-    }
-  }
-
-  const handleLogout = () => {
-    setIsLoggedIn(false)
-    setUsername("")
-    setPassword("")
-  }
-
-  const handleCloudConnect = () => {
-    // In a real application, you would use the connectionString to connect to the cloud provider
-    console.log(`Connecting to ${cloudProvider} with connection string: ${connectionString}`)
-    // Reset the form
-    setCloudProvider(null)
-    setConnectionString("")
-  }
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
@@ -198,53 +174,8 @@ export function FocalPoint() {
           <Button variant="outline" size="icon" onClick={toggleTheme}>
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </Button>
-          <CloudStorageDialog/>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <LogIn className="mr-2 h-4 w-4" />
-                {isLoggedIn ? 'Logout' : 'Login'}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-background text-foreground">
-              <DialogHeader>
-                <DialogTitle>{isLoggedIn ? 'Logout' : 'Login'}</DialogTitle>
-                <DialogDescription>
-                  {isLoggedIn ? 'Are you sure you want to logout?' : 'Enter your credentials to log in.'}
-                </DialogDescription>
-              </DialogHeader>
-              {isLoggedIn ? (
-                <Button onClick={handleLogout}>Logout</Button>
-              ) : (
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="username" className="text-right">
-                      Username
-                    </Label>
-                    <Input
-                      id="username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="col-span-3"
-                    />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="password" className="text-right">
-                      Password
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="col-span-3"
-                    />
-                  </div>
-                  <Button onClick={handleLogin}>Login</Button>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
+          <CloudStorageDialog />
+          <LoginComponent />
         </div>
       </div>
       

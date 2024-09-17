@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Cloud } from 'lucide-react';
-import { auth, User, FirebaseAuth } from '..firebaseConfig'; // Import the FirebaseAuth component
+import { auth, User, FirebaseAuth } from '../firebaseConfig'; // Import the FirebaseAuth component
 import { useAuthState } from 'react-firebase-hooks/auth';
 
  
