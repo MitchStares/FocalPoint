@@ -10,8 +10,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Cloud } from 'lucide-react'
+import { Cloud } from 'lucide-react';
+import { auth, User, FirebaseAuth } from '..firebaseConfig'; // Import the FirebaseAuth component
+import { useAuthState } from 'react-firebase-hooks/auth';
 
+ 
 interface CloudStorageConfig {
   provider: string;
   projectId?: string;
@@ -59,27 +62,16 @@ const CloudStorageDialog: React.FC = () => {
     switch (cloudProvider) {
       case 'gcp':
         return (
-          <>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="projectId" className="text-right">Project ID</Label>
-              <Input
-                id="projectId"
-                value={config.projectId || ''}
-                onChange={(e) => handleConfigChange('projectId', e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="keyFilename" className="text-right">Key Filename</Label>
-              <Input
-                id="keyFilename"
-                value={config.keyFilename || ''}
-                onChange={(e) => handleConfigChange('keyFilename', e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-          </>
-        )
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="projectId" className="text-right">Project ID</Label>
+            <Input
+              id="projectId"
+              value={config.projectId || ''}
+              onChange={(e) => handleConfigChange('projectId', e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+        );
       case 'azure':
         return (
           <>
