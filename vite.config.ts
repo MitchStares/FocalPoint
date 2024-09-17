@@ -48,4 +48,5 @@ export default defineConfig({
       },
     },
   },
+  base: process.env.ELECTRON === 'true' ? './' : '/',
 })

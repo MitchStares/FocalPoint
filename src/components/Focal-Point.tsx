@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,112 +17,113 @@ import {
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
-import { Cloud, Filter, Tag, Download, Grid, Image as ImageIcon, LogIn, ZoomIn, ZoomOut, Maximize, Minimize, Moon, Sun } from 'lucide-react'
+import { Cloud, Filter, Tag, Download, Grid, Image as ImageIcon, LogIn, ZoomIn, ZoomOut, Maximize, Minimize, Moon, Sun, Folder } from 'lucide-react'
 import { useTheme } from "next-themes"
 import CloudStorageDialog from './CloudStorageDialog'
 import { LoginComponent } from './LoginComponent'
 
-// Updated mock data with real image URLs
-const mockImages = [
-  { id: 1, url: "https://i.imgur.com/RVTlNOj.jpg", tags: ["deer", "daytime"], metadata: { date: "2023-06-01", time: "14:30", location: "Forest Edge" } },
-  { id: 2, url: "https://i.imgur.com/9JHhNGw.jpg", tags: ["bear", "nighttime"], metadata: { date: "2023-06-02", time: "02:15", location: "River Bank" } },
-  { id: 3, url: "https://i.imgur.com/Yk3MNXt.jpg", tags: ["fox", "daytime"], metadata: { date: "2023-06-03", time: "10:45", location: "Meadow" } },
-  { id: 4, url: "https://i.imgur.com/Qx8wWDQ.jpg", tags: ["raccoon", "nighttime"], metadata: { date: "2023-06-04", time: "23:20", location: "Campsite" } },
-  { id: 5, url: "https://i.imgur.com/Ow4qPwP.jpg", tags: ["owl", "nighttime"], metadata: { date: "2023-06-05", time: "01:10", location: "Old Oak Tree" } },
-  { id: 6, url: "https://i.imgur.com/JRhLVzR.jpg", tags: ["coyote", "daytime"], metadata: { date: "2023-06-06", time: "17:55", location: "Hiking Trail" } },
-]
+declare global {
+  interface Window {
+    electron: {
+      openDirectory: () => Promise<string | undefined>;
+      readDirectory: (path: string) => Promise<string[]>;
+      readFile: (path: string) => Promise<string>;
+    }
+  }
+}
 
 export function FocalPoint() {
-  const [images, setImages] = useState(mockImages)
-  const [filteredImages, setFilteredImages] = useState(mockImages)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [newTag, setNewTag] = useState("")
-  const [filterTag, setFilterTag] = useState("")
-  const [selectedImages, setSelectedImages] = useState<number[]>([])
-  const [bulkTag, setBulkTag] = useState("")
-  const [viewMode, setViewMode] = useState<'single' | 'grid'>('single')
-  const [isFullScreen, setIsFullScreen] = useState(false)
+  const [images, setImages] = useState<{ id: number; url: string; tags: string[]; metadata: any }[]>([]);
+  const [currentDirectory, setCurrentDirectory] = useState<string | null>(null);
+  const [filteredImages, setFilteredImages] = useState(images);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [newTag, setNewTag] = useState("");
+  const [filterTag, setFilterTag] = useState("");
+  const [selectedImages, setSelectedImages] = useState<number[]>([]);
+  const [bulkTag, setBulkTag] = useState("");
+  const [viewMode, setViewMode] = useState<'single' | 'grid'>('single');
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState({
     dateRange: [new Date().toISOString().split('T')[0], new Date().toISOString().split('T')[0]],
     timeRange: ["00:00", "23:59"],
     locations: [] as string[],
     onlyTagged: false,
     onlyUntagged: false,
-  })
+  });
 
-  const currentImage = filteredImages[currentImageIndex] || null
+  const currentImage = filteredImages[currentImageIndex] || null;
 
   useEffect(() => {
-    applyFilters()
-  }, [filterTag, advancedFilters, images])
+    applyFilters();
+  }, [filterTag, advancedFilters, images]);
 
   const applyFilters = () => {
     const filtered = images.filter(img => {
       // Basic tag filter
       if (filterTag && !img.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase()))) {
-        return false
+        return false;
       }
       
       // Advanced filters
-      const imgDate = img.metadata.date
-      const imgTime = img.metadata.time
+      const imgDate = img.metadata.date;
+      const imgTime = img.metadata.time;
       if (imgDate < advancedFilters.dateRange[0] || imgDate > advancedFilters.dateRange[1]) {
-        return false
+        return false;
       }
       if (imgTime < advancedFilters.timeRange[0] || imgTime > advancedFilters.timeRange[1]) {
-        return false
+        return false;
       }
       if (advancedFilters.locations.length > 0 && !advancedFilters.locations.includes(img.metadata.location)) {
-        return false
+        return false;
       }
       if (advancedFilters.onlyTagged && img.tags.length === 0) {
-        return false
+        return false;
       }
       if (advancedFilters.onlyUntagged && img.tags.length > 0) {
-        return false
+        return false;
       }
-      return true
-    })
-    setFilteredImages(filtered)
-    setCurrentImageIndex(0)
-  }
+      return true;
+    });
+    setFilteredImages(filtered);
+    setCurrentImageIndex(0);
+  };
 
   const addTag = () => {
     if (currentImage && newTag && !currentImage.tags.includes(newTag)) {
-      updateImageTags(currentImage.id, [...currentImage.tags, newTag])
-      setNewTag("")
+      updateImageTags(currentImage.id, [...currentImage.tags, newTag]);
+      setNewTag("");
     }
-  }
+  };
 
   const removeTag = (tagToRemove: string) => {
     if (currentImage) {
-      updateImageTags(currentImage.id, currentImage.tags.filter(tag => tag !== tagToRemove))
+      updateImageTags(currentImage.id, currentImage.tags.filter(tag => tag !== tagToRemove));
     }
-  }
+  };
 
   const updateImageTags = (imageId: number, newTags: string[]) => {
     setImages(prevImages => prevImages.map(img => 
       img.id === imageId ? { ...img, tags: newTags } : img
-    ))
-  }
+    ));
+  };
 
   const nextImage = () => {
     if (filteredImages.length > 0) {
-      setCurrentImageIndex(prev => (prev + 1) % filteredImages.length)
+      setCurrentImageIndex(prev => (prev + 1) % filteredImages.length);
     }
-  }
+  };
 
   const prevImage = () => {
     if (filteredImages.length > 0) {
-      setCurrentImageIndex(prev => (prev - 1 + filteredImages.length) % filteredImages.length)
+      setCurrentImageIndex(prev => (prev - 1 + filteredImages.length) % filteredImages.length);
     }
-  }
+  };
 
   const toggleImageSelection = (imageId: number) => {
     setSelectedImages(prev => 
       prev.includes(imageId) ? prev.filter(id => id !== imageId) : [...prev, imageId]
-    )
-  }
+    );
+  };
 
   const applyBulkTag = () => {
     if (bulkTag) {
@@ -130,41 +131,59 @@ export function FocalPoint() {
         selectedImages.includes(img.id) && !img.tags.includes(bulkTag)
           ? { ...img, tags: [...img.tags, bulkTag] }
           : img
-      ))
-      setBulkTag("")
-      setSelectedImages([])
+      ));
+      setBulkTag("");
+      setSelectedImages([]);
     }
-  }
+  };
 
   const exportTagData = () => {
-    const tagData = images.map(img => ({ id: img.id, tags: img.tags }))
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tagData))
-    const downloadAnchorNode = document.createElement('a')
-    downloadAnchorNode.setAttribute("href", dataStr)
-    downloadAnchorNode.setAttribute("download", "wildlife_tags.json")
-    document.body.appendChild(downloadAnchorNode)
-    downloadAnchorNode.click()
-    downloadAnchorNode.remove()
-  }
-
+    const tagData = images.map(img => ({ id: img.id, tags: img.tags }));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tagData));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "wildlife_tags.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
 
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen()
-      setIsFullScreen(true)
+      document.documentElement.requestFullscreen();
+      setIsFullScreen(true);
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen()
-        setIsFullScreen(false)
+        document.exitFullscreen();
+        setIsFullScreen(false);
       }
     }
-  }
+  };
 
-  const { setTheme, theme } = useTheme()
+  const { setTheme, theme } = useTheme();
 
   const toggleTheme = () => {
-    setTheme(theme === "light" ? "dark" : "light")
-  }
+    setTheme(theme === "light" ? "dark" : "light");
+  };
+
+  const loadLocalImages = useCallback(async () => {
+    const directory = await window.electron.openDirectory();
+    if (directory) {
+      setCurrentDirectory(directory);
+      const files = await window.electron.readDirectory(directory);
+      const newImages = await Promise.all(files.map(async (file, index) => {
+        const filePath = `${directory}/${file}`;
+        const base64 = await window.electron.readFile(filePath);
+        return {
+          id: index + 1,
+          url: `data:image/jpeg;base64,${base64}`,
+          tags: [],
+          metadata: { filename: file }
+        };
+      }));
+      setImages(newImages);
+    }
+  }, []);
 
   return (
     <div className="max-w-6xl mx-auto p-4">
@@ -413,6 +432,11 @@ export function FocalPoint() {
           Apply to Selected ({selectedImages.length})
         </Button>
       </div>
+
+      <Button onClick={loadLocalImages} className="w-full mb-4">
+        <Folder className="mr-2 h-4 w-4" />
+        Load Local Images
+      </Button>
 
       <Button onClick={exportTagData} className="w-full">
         <Download className="mr-2 h-4 w-4" />
