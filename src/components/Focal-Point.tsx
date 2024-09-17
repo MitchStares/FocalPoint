@@ -21,6 +21,7 @@ import { Cloud, Filter, Tag, Download, Grid, Image as ImageIcon, LogIn, ZoomIn, 
 import { useTheme } from "next-themes"
 import CloudStorageDialog from './CloudStorageDialog'
 import { LoginComponent } from './LoginComponent'
+import { Slider } from "@/components/ui/slider"
 
 declare global {
   interface Window {
@@ -50,6 +51,10 @@ export function FocalPoint() {
     onlyTagged: false,
     onlyUntagged: false,
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const imagesPerPage = 20;
+  const [imageSize, setImageSize] = useState(100);
+  const [isImageFullScreen, setIsImageFullScreen] = useState(false);
 
   const currentImage = filteredImages[currentImageIndex] || null;
 
@@ -90,14 +95,24 @@ export function FocalPoint() {
 
   const addTag = () => {
     if (currentImage && newTag && !currentImage.tags.includes(newTag)) {
-      updateImageTags(currentImage.id, [...currentImage.tags, newTag]);
+      const updatedTags = [...currentImage.tags, newTag];
+      updateImageTags(currentImage.id, updatedTags);
       setNewTag("");
+      setCurrentImageIndex(prevIndex => {
+        const updatedIndex = filteredImages.findIndex(img => img.id === currentImage.id);
+        return updatedIndex !== -1 ? updatedIndex : prevIndex;
+      });
     }
   };
 
   const removeTag = (tagToRemove: string) => {
     if (currentImage) {
-      updateImageTags(currentImage.id, currentImage.tags.filter(tag => tag !== tagToRemove));
+      const updatedTags = currentImage.tags.filter(tag => tag !== tagToRemove);
+      updateImageTags(currentImage.id, updatedTags);
+      setCurrentImageIndex(prevIndex => {
+        const updatedIndex = filteredImages.findIndex(img => img.id === currentImage.id);
+        return updatedIndex !== -1 ? updatedIndex : prevIndex;
+      });
     }
   };
 
@@ -105,6 +120,12 @@ export function FocalPoint() {
     setImages(prevImages => prevImages.map(img => 
       img.id === imageId ? { ...img, tags: newTags } : img
     ));
+    setFilteredImages(prevFiltered => {
+      const updatedFiltered = prevFiltered.map(img => 
+        img.id === imageId ? { ...img, tags: newTags } : img
+      );
+      return updatedFiltered;
+    });
   };
 
   const nextImage = () => {
@@ -308,37 +329,54 @@ export function FocalPoint() {
           {currentImage ? (
             <>
               <div className="mb-4 relative">
-                <TransformWrapper>
-                  {({ zoomIn, zoomOut, resetTransform }) => (
-                    <>
-                      <div className="absolute top-2 right-2 z-10 flex gap-2">
-                        <Button variant="outline" size="icon" onClick={() => zoomIn()}>
-                          <ZoomIn className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => zoomOut()}>
-                          <ZoomOut className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => resetTransform()}>
-                          <Maximize className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <TransformComponent>
-                        <img 
-                          src={currentImage.url} 
-                          alt={`Wildlife image ${currentImageIndex + 1}`} 
-                          className="w-full h-auto rounded-lg shadow-lg"
-                        />
-                      </TransformComponent>
-                    </>
-                  )}
-                </TransformWrapper>
+                <div className={`relative ${isImageFullScreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+                  <TransformWrapper>
+                    {({ zoomIn, zoomOut, resetTransform }) => (
+                      <>
+                        <div className="absolute top-2 right-2 z-10 flex gap-2">
+                          <Button variant="outline" size="icon" onClick={() => zoomIn()}>
+                            <ZoomIn className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" onClick={() => zoomOut()}>
+                            <ZoomOut className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" onClick={() => resetTransform()}>
+                            <Maximize className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" onClick={() => setIsImageFullScreen(!isImageFullScreen)}>
+                            {isImageFullScreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        <TransformComponent>
+                          <img 
+                            src={currentImage.url} 
+                            alt={`Wildlife image ${currentImageIndex + 1}`} 
+                            style={{ width: `${imageSize}%`, height: 'auto' }}
+                            className="mx-auto rounded-lg shadow-lg"
+                          />
+                        </TransformComponent>
+                      </>
+                    )}
+                  </TransformWrapper>
+                </div>
                 <Checkbox
                   checked={selectedImages.includes(currentImage.id)}
                   onCheckedChange={() => toggleImageSelection(currentImage.id)}
                   className="absolute top-2 left-2 z-10"
                 />
               </div>
-
+              <div className="mb-4 flex items-center gap-4">
+                <span className="text-sm">Image Size:</span>
+                <Slider
+                  min={10}
+                  max={100}
+                  step={10}
+                  value={[imageSize]}
+                  onValueChange={(value) => setImageSize(value[0])}
+                  className="w-64"
+                />
+                <span className="text-sm">{imageSize}%</span>
+              </div>
               <div className="flex gap-2 mb-4">
                 <Input
                   type="text"
@@ -387,29 +425,48 @@ export function FocalPoint() {
         </TabsContent>
         <TabsContent value="grid">
           {filteredImages.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
-              {filteredImages.map((image) => (
-                <div key={image.id} className="relative">
-                  <img 
-                    src={image.url} 
-                    alt={`Wildlife image ${image.id}`} 
-                    className="w-full h-auto rounded-lg shadow-lg"
-                  />
-                  <Checkbox
-                    checked={selectedImages.includes(image.id)}
-                    onCheckedChange={() => toggleImageSelection(image.id)}
-                    className="absolute top-2 left-2"
-                  />
-                  <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
-                    {image.tags.map(tag => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
+                {filteredImages
+                  .slice((currentPage - 1) * imagesPerPage, currentPage * imagesPerPage)
+                  .map((image) => (
+                    <div key={image.id} className="relative">
+                      <img 
+                        src={image.url} 
+                        alt={`Wildlife image ${image.id}`} 
+                        className="w-full h-auto rounded-lg shadow-lg"
+                      />
+                      <Checkbox
+                        checked={selectedImages.includes(image.id)}
+                        onCheckedChange={() => toggleImageSelection(image.id)}
+                        className="absolute top-2 left-2"
+                      />
+                      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
+                        {image.tags.map(tag => (
+                          <Badge key={tag} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              <div className="flex justify-between items-center mt-4">
+                <Button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <span>Page {currentPage} of {Math.ceil(filteredImages.length / imagesPerPage)}</span>
+                <Button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredImages.length / imagesPerPage)))}
+                  disabled={currentPage === Math.ceil(filteredImages.length / imagesPerPage)}
+                >
+                  Next
+                </Button>
+              </div>
+            </>
           ) : (
             <div className="text-center py-8">
               <p className="text-xl font-semibold">No images found</p>
