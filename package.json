@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-   "electron:dev": "concurrently \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && electron electron/main.cjs\"",
+    "electron:dev": "concurrently \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && electron electron/main.cjs\"",
     "electron:build": "npm run build && electron-builder"
   },
   "dependencies": {
@@ -27,6 +27,7 @@
     "cross-env": "^7.0.3",
     "electron": "^32.1.0",
     "electron-builder": "^25.0.5",
+    "exifreader": "^4.23.5",
     "firebase": "^10.13.1",
     "lucide-react": "^0.441.0",
     "next-themes": "^0.3.0",
@@ -73,10 +74,14 @@
       "category": "public.app-category.productivity"
     },
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "linux": {
-      "target": ["AppImage"]
+      "target": [
+        "AppImage"
+      ]
     }
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,7 @@ import { useTheme } from "next-themes"
 import CloudStorageDialog from './CloudStorageDialog'
 import { LoginComponent } from './LoginComponent'
 import { Slider } from "@/components/ui/slider"
+import { Image } from '@/types/image';
 
 declare global {
   interface Window {
@@ -29,14 +30,24 @@ declare global {
       openDirectory: () => Promise<string | undefined>;
       readDirectory: (path: string) => Promise<string[]>;
       readFile: (path: string) => Promise<string>;
+      getImageMetadata: (path: string) => Promise<{
+        date: string;
+        time: string;
+        location: string;
+        camera: string;
+        lens: string;
+        iso: string;
+        aperture: string;
+        shutterSpeed: string;
+      }>;
     }
   }
 }
 
 export function FocalPoint() {
-  const [images, setImages] = useState<{ id: number; url: string; tags: string[]; metadata: any }[]>([]);
+  const [images, setImages] = useState<Image[]>([]);
   const [currentDirectory, setCurrentDirectory] = useState<string | null>(null);
-  const [filteredImages, setFilteredImages] = useState(images);
+  const [filteredImages, setFilteredImages] = useState<Image[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [newTag, setNewTag] = useState("");
   const [filterTag, setFilterTag] = useState("");
@@ -58,39 +69,16 @@ export function FocalPoint() {
 
   const currentImage = filteredImages[currentImageIndex] || null;
 
-  useEffect(() => {
-    applyFilters();
-  }, [filterTag, advancedFilters, images]);
-
-  const applyFilters = () => {
-    const filtered = images.filter(img => {
-      // Basic tag filter
-      if (filterTag && !img.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase()))) {
-        return false;
-      }
-      
-      // Advanced filters
-      const imgDate = img.metadata.date;
-      const imgTime = img.metadata.time;
-      if (imgDate < advancedFilters.dateRange[0] || imgDate > advancedFilters.dateRange[1]) {
-        return false;
-      }
-      if (imgTime < advancedFilters.timeRange[0] || imgTime > advancedFilters.timeRange[1]) {
-        return false;
-      }
-      if (advancedFilters.locations.length > 0 && !advancedFilters.locations.includes(img.metadata.location)) {
-        return false;
-      }
-      if (advancedFilters.onlyTagged && img.tags.length === 0) {
-        return false;
-      }
-      if (advancedFilters.onlyUntagged && img.tags.length > 0) {
-        return false;
-      }
-      return true;
+  const updateImageTags = (imageId: number, newTags: string[]) => {
+    setImages(prevImages => prevImages.map(img => 
+      img.id === imageId ? { ...img, tags: newTags } : img
+    ));
+    setFilteredImages(prevFiltered => {
+      const updatedFiltered = prevFiltered.map(img => 
+        img.id === imageId ? { ...img, tags: newTags } : img
+      );
+      return updatedFiltered;
     });
-    setFilteredImages(filtered);
-    setCurrentImageIndex(0);
   };
 
   const addTag = () => {
@@ -114,18 +102,6 @@ export function FocalPoint() {
         return updatedIndex !== -1 ? updatedIndex : prevIndex;
       });
     }
-  };
-
-  const updateImageTags = (imageId: number, newTags: string[]) => {
-    setImages(prevImages => prevImages.map(img => 
-      img.id === imageId ? { ...img, tags: newTags } : img
-    ));
-    setFilteredImages(prevFiltered => {
-      const updatedFiltered = prevFiltered.map(img => 
-        img.id === imageId ? { ...img, tags: newTags } : img
-      );
-      return updatedFiltered;
-    });
   };
 
   const nextImage = () => {
@@ -187,24 +163,93 @@ export function FocalPoint() {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
-  const loadLocalImages = useCallback(async () => {
-    const directory = await window.electron.openDirectory();
-    if (directory) {
-      setCurrentDirectory(directory);
-      const files = await window.electron.readDirectory(directory);
-      const newImages = await Promise.all(files.map(async (file, index) => {
-        const filePath = `${directory}/${file}`;
-        const base64 = await window.electron.readFile(filePath);
-        return {
-          id: index + 1,
-          url: `data:image/jpeg;base64,${base64}`,
-          tags: [],
-          metadata: { filename: file }
-        };
-      }));
-      setImages(newImages);
+  const loadLocalImages = async () => {
+    try {
+      const directory = await window.electron.openDirectory();
+      console.log('Selected directory:', directory);
+      if (directory) {
+        setCurrentDirectory(directory);
+        const files = await window.electron.readDirectory(directory);
+        console.log('Files returned from readDirectory:', files);
+        if (files.length === 0) {
+          console.log('No image files found in the directory');
+          return;
+        }
+        const newImages = await Promise.all(files.map(async (file, index) => {
+          const filePath = `${directory}/${file}`;
+          console.log('Processing file:', filePath);
+          try {
+            const base64 = await window.electron.readFile(filePath);
+            const metadata = await window.electron.getImageMetadata(filePath);
+            return {
+              id: index + 1,
+              url: `data:image/jpeg;base64,${base64}`,
+              tags: [],
+              metadata: {
+                filename: file,
+                ...metadata
+              }
+            };
+          } catch (error) {
+            console.error('Error processing file:', filePath, error);
+            return null;
+          }
+        }));
+        const validImages = newImages.filter(img => img !== null);
+        setImages(validImages);
+        setFilteredImages(validImages);
+      }
+    } catch (error) {
+      console.error('Error in loadLocalImages:', error);
     }
-  }, []);
+  };
+
+  const applyFilters = () => {
+    const filtered = images.filter(image => {
+      const imageDate = new Date(image.metadata.date);
+      const imageTime = image.metadata.time;
+      const [startDate, endDate] = advancedFilters.dateRange;
+      const [startTime, endTime] = advancedFilters.timeRange;
+      
+      const dateInRange = imageDate >= new Date(startDate) && imageDate <= new Date(endDate);
+      const timeInRange = imageTime >= startTime && imageTime <= endTime;
+      const locationMatch = advancedFilters.locations.length === 0 || advancedFilters.locations.includes(image.metadata.location);
+      const tagMatch = 
+        (!advancedFilters.onlyTagged && !advancedFilters.onlyUntagged) ||
+        (advancedFilters.onlyTagged && image.tags.length > 0) ||
+        (advancedFilters.onlyUntagged && image.tags.length === 0);
+      
+      return dateInRange && timeInRange && locationMatch && tagMatch;
+    });
+
+    setFilteredImages(filtered);
+    setCurrentImageIndex(0);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowRight') {
+        nextImage();
+      } else if (event.key === 'ArrowLeft') {
+        prevImage();
+      } else if (event.key === 'Tab') {
+        event.preventDefault();
+        const tagInput = document.getElementById('newTagInput');
+        if (tagInput) {
+          (tagInput as HTMLInputElement).focus();
+        }
+      } else if (event.key === 'Enter' && document.activeElement?.id === 'newTagInput') {
+        addTag();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [nextImage, prevImage, addTag]);
 
   return (
     <div className="max-w-6xl mx-auto p-4">
@@ -379,6 +424,7 @@ export function FocalPoint() {
               </div>
               <div className="flex gap-2 mb-4">
                 <Input
+                  id="newTagInput"
                   type="text"
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
@@ -408,6 +454,11 @@ export function FocalPoint() {
                   <div>Date: {currentImage.metadata.date}</div>
                   <div>Time: {currentImage.metadata.time}</div>
                   <div>Location: {currentImage.metadata.location}</div>
+                  <div>Camera: {currentImage.metadata.camera}</div>
+                  <div>Lens: {currentImage.metadata.lens}</div>
+                  <div>ISO: {currentImage.metadata.iso}</div>
+                  <div>Aperture: {currentImage.metadata.aperture}</div>
+                  <div>Shutter Speed: {currentImage.metadata.shutterSpeed}</div>
                 </div>
               </div>
 
