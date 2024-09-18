@@ -23,6 +23,7 @@ import CloudStorageDialog from './CloudStorageDialog'
 import { LoginComponent } from './LoginComponent'
 import { Slider } from "@/components/ui/slider"
 import { Image } from '@/types/image';
+import ImageLoadingProgress from './Image-Loading-Progress'
 
 declare global {
   interface Window {
@@ -66,6 +67,9 @@ export function FocalPoint() {
   const imagesPerPage = 20;
   const [imageSize, setImageSize] = useState(100);
   const [isImageFullScreen, setIsImageFullScreen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalImagesToLoad, setTotalImagesToLoad] = useState(0);
+  const [loadedImages, setLoadedImages] = useState(0);
 
   const currentImage = filteredImages[currentImageIndex] || null;
 
@@ -175,12 +179,17 @@ export function FocalPoint() {
           console.log('No image files found in the directory');
           return;
         }
+        setIsLoading(true);
+        setTotalImagesToLoad(files.length);
+        setLoadedImages(0);
+
         const newImages = await Promise.all(files.map(async (file, index) => {
           const filePath = `${directory}/${file}`;
           console.log('Processing file:', filePath);
           try {
             const base64 = await window.electron.readFile(filePath);
             const metadata = await window.electron.getImageMetadata(filePath);
+            setLoadedImages(prev => prev + 1);
             return {
               id: index + 1,
               url: `data:image/jpeg;base64,${base64}`,
@@ -192,6 +201,7 @@ export function FocalPoint() {
             };
           } catch (error) {
             console.error('Error processing file:', filePath, error);
+            setLoadedImages(prev => prev + 1);
             return null;
           }
         }));
@@ -201,6 +211,8 @@ export function FocalPoint() {
       }
     } catch (error) {
       console.error('Error in loadLocalImages:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -225,6 +237,14 @@ export function FocalPoint() {
     setFilteredImages(filtered);
     setCurrentImageIndex(0);
     setCurrentPage(1);
+  };
+
+  const handleImageDoubleClick = (imageId: number) => {
+    const index = filteredImages.findIndex(img => img.id === imageId);
+    if (index !== -1) {
+      setCurrentImageIndex(index);
+      setViewMode('single');
+    }
   };
 
   useEffect(() => {
@@ -485,13 +505,22 @@ export function FocalPoint() {
                       <img 
                         src={image.url} 
                         alt={`Wildlife image ${image.id}`} 
-                        className="w-full h-auto rounded-lg shadow-lg"
+                        className="w-full h-auto rounded-lg shadow-lg cursor-pointer"
+                        onDoubleClick={() => handleImageDoubleClick(image.id)}
                       />
-                      <Checkbox
-                        checked={selectedImages.includes(image.id)}
-                        onCheckedChange={() => toggleImageSelection(image.id)}
-                        className="absolute top-2 left-2"
-                      />
+                      <div className="absolute top-2 left-2 flex gap-2">
+                        <Checkbox
+                          checked={selectedImages.includes(image.id)}
+                          onCheckedChange={() => toggleImageSelection(image.id)}
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleImageDoubleClick(image.id)}
+                        >
+                          View
+                        </Button>
+                      </div>
                       <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
                         {image.tags.map(tag => (
                           <Badge key={tag} variant="secondary" className="text-xs">
@@ -504,6 +533,12 @@ export function FocalPoint() {
               </div>
               <div className="flex justify-between items-center mt-4">
                 <Button 
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  First
+                </Button>
+                <Button 
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
                 >
@@ -515,6 +550,31 @@ export function FocalPoint() {
                   disabled={currentPage === Math.ceil(filteredImages.length / imagesPerPage)}
                 >
                   Next
+                </Button>
+                <Button 
+                  onClick={() => setCurrentPage(Math.ceil(filteredImages.length / imagesPerPage))}
+                  disabled={currentPage === Math.ceil(filteredImages.length / imagesPerPage)}
+                >
+                  Last
+                </Button>
+              </div>
+              <div className="mt-4 flex justify-center items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={Math.ceil(filteredImages.length / imagesPerPage)}
+                  value={currentPage}
+                  onChange={(e) => {
+                    const page = parseInt(e.target.value);
+                    if (page >= 1 && page <= Math.ceil(filteredImages.length / imagesPerPage)) {
+                      setCurrentPage(page);
+                    }
+                  }}
+                  className="w-20"
+                />
+                <span>of {Math.ceil(filteredImages.length / imagesPerPage)}</span>
+                <Button onClick={() => setCurrentPage(parseInt((document.querySelector('input[type="number"]') as HTMLInputElement).value))}>
+                  Go
                 </Button>
               </div>
             </>
@@ -550,6 +610,18 @@ export function FocalPoint() {
         <Download className="mr-2 h-4 w-4" />
         Export Tag Data
       </Button>
+
+      {isLoading && (
+        <Dialog open={isLoading} onOpenChange={setIsLoading}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Loading Images</DialogTitle>
+              <DialogDescription>Please wait while we load your images.</DialogDescription>
+            </DialogHeader>
+            <ImageLoadingProgress totalImages={totalImagesToLoad} loadedImages={loadedImages} />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
