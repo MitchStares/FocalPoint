@@ -1,30 +1,29 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
-import { Cloud, Filter, Tag, Download, Grid, Image as ImageIcon, LogIn, ZoomIn, ZoomOut, Maximize, Minimize, Moon, Sun, Folder } from 'lucide-react'
+import { Download, Grid, Image as ImageIcon, Maximize, Minimize, Moon, Sun, Folder } from 'lucide-react'
 import { useTheme } from "next-themes"
 import CloudStorageDialog from './CloudStorageDialog'
 import { LoginComponent } from './LoginComponent'
-import { Slider } from "@/components/ui/slider"
 import { Image } from '@/types/Image'
 import ImageLoadingProgress from './Image-Loading-Progress'
 import LazyImage from './LazyImage'
+import FilterMenu from './FilterMenu'
+import ImageMetadata from './ImageMetadata'
+import TagManagement from './TagManagement'
+import ImageNavigation from './ImageNavigation'
+import BulkTagging from './BulkTagging'
+import SingleView from './SingleView'
+import GridView from './GridView'
 
 declare global {
   interface Window {
@@ -46,41 +45,6 @@ declare global {
   }
 }
 
-const MemoizedGridItem = React.memo(({ image, selectedImages, toggleImageSelection, handleImageDoubleClick }: {
-  image: Image;
-  selectedImages: number[];
-  toggleImageSelection: (id: number) => void;
-  handleImageDoubleClick: (id: number) => void;
-}) => (
-  <div className="relative">
-    <LazyImage
-      src={image.url}
-      alt={`Wildlife image ${image.id}`}
-      className="w-full h-auto rounded-lg shadow-lg cursor-pointer"
-      onDoubleClick={() => handleImageDoubleClick(image.id)}
-    />
-    <div className="absolute top-2 left-2 flex gap-2">
-      <Checkbox
-        checked={selectedImages.includes(image.id)}
-        onCheckedChange={() => toggleImageSelection(image.id)}
-      />
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => handleImageDoubleClick(image.id)}
-      >
-        View
-      </Button>
-    </div>
-    <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
-      {image.tags.map(tag => (
-        <Badge key={tag} variant="secondary" className="text-xs">
-          {tag}
-        </Badge>
-      ))}
-    </div>
-  </div>
-));
 
 export function FocalPoint() {
   const [images, setImages] = useState<Image[]>([]);
@@ -406,97 +370,14 @@ export function FocalPoint() {
       </div>
       
       <div className="flex justify-between mb-4">
-        <div className="flex gap-2">
-          <Input
-            type="text"
-            value={filterTag}
-            onChange={(e) => setFilterTag(e.target.value)}
-            placeholder="Filter by tag"
-            className="w-40"
-          />
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Filter className="mr-2 h-4 w-4" />
-                Advanced Filters
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-background text-foreground">
-              <DialogHeader>
-                <DialogTitle>Advanced Filters</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Date Range</Label>
-                  <div className="col-span-3 flex gap-2">
-                    <Input
-                      type="date"
-                      value={advancedFilters.dateRange[0]}
-                      onChange={(e) => setAdvancedFilters(prev => ({...prev, dateRange: [e.target.value, prev.dateRange[1]]}))}
-                    />
-                    <Input
-                      type="date"
-                      value={advancedFilters.dateRange[1]}
-                      onChange={(e) => setAdvancedFilters(prev => ({...prev, dateRange: [prev.dateRange[0], e.target.value]}))}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Time Range</Label>
-                  <div className="col-span-3 flex gap-2">
-                    <Input
-                      type="time"
-                      value={advancedFilters.timeRange[0]}
-                      onChange={(e) => setAdvancedFilters(prev => ({...prev, timeRange: [e.target.value, prev.timeRange[1]]}))}
-                    />
-                    <Input
-                      type="time"
-                      value={advancedFilters.timeRange[1]}
-                      onChange={(e) => setAdvancedFilters(prev => ({...prev, timeRange: [prev.timeRange[0], e.target.value]}))}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Locations</Label>
-                  <div className="col-span-3">
-                    {Array.from(new Set(images.map(img => img.metadata.location))).map(location => (
-                      <div key={location} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={location}
-                          checked={advancedFilters.locations.includes(location)}
-                          onCheckedChange={(checked) => {
-                            setAdvancedFilters(prev => ({
-                              ...prev,
-                              locations: checked
-                                ? [...prev.locations, location]
-                                : prev.locations.filter(l => l !== location)
-                            }))
-                          }}
-                        />
-                        <label htmlFor={location}>{location}</label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Only Tagged</Label>
-                  <Switch
-                    checked={advancedFilters.onlyTagged}
-                    onCheckedChange={(checked) => setAdvancedFilters(prev => ({...prev, onlyTagged: checked}))}
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Only Untagged</Label>
-                  <Switch
-                    checked={advancedFilters.onlyUntagged}
-                    onCheckedChange={(checked) => setAdvancedFilters(prev => ({...prev, onlyUntagged: checked}))}
-                  />
-                </div>
-              </div>
-              <Button onClick={applyFilters}>Apply Filters</Button>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <FilterMenu
+          filterTag={filterTag}
+          setFilterTag={setFilterTag}
+          advancedFilters={advancedFilters}
+          setAdvancedFilters={setAdvancedFilters}
+          applyFilters={applyFilters}
+          images={images}
+        />
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={() => setViewMode('single')}>
             <ImageIcon className="h-4 w-4" />
@@ -513,101 +394,21 @@ export function FocalPoint() {
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'single' | 'grid')}>
         <TabsContent value="single">
           {currentImage ? (
-            <>
-              <div className="mb-4 relative">
-                <div className={`relative ${isImageFullScreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
-                  <TransformWrapper>
-                    {({ zoomIn, zoomOut, resetTransform }) => (
-                      <>
-                        <div className="absolute top-2 right-2 z-10 flex gap-2">
-                          <Button variant="outline" size="icon" onClick={() => zoomIn()}>
-                            <ZoomIn className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="icon" onClick={() => zoomOut()}>
-                            <ZoomOut className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="icon" onClick={() => resetTransform()}>
-                            <Maximize className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="icon" onClick={() => setIsImageFullScreen(!isImageFullScreen)}>
-                            {isImageFullScreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                        <TransformComponent>
-                          <img 
-                            src={currentImage.url} 
-                            alt={`Wildlife image ${currentImageIndex + 1}`} 
-                            style={{ width: `${imageSize}%`, height: 'auto' }}
-                            className="mx-auto rounded-lg shadow-lg"
-                          />
-                        </TransformComponent>
-                      </>
-                    )}
-                  </TransformWrapper>
-                </div>
-                <Checkbox
-                  checked={selectedImages.includes(currentImage.id)}
-                  onCheckedChange={() => toggleImageSelection(currentImage.id)}
-                  className="absolute top-2 left-2 z-10"
-                />
-              </div>
-              <div className="mb-4 flex items-center gap-4">
-                <span className="text-sm">Image Size:</span>
-                <Slider
-                  min={10}
-                  max={100}
-                  step={10}
-                  value={[imageSize]}
-                  onValueChange={(value) => setImageSize(value[0])}
-                  className="w-64"
-                />
-                <span className="text-sm">{imageSize}%</span>
-              </div>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  id="newTagInput"
-                  type="text"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Enter new tag"
-                  className="flex-grow"
-                />
-                <Button onClick={addTag}>Add Tag</Button>
-              </div>
-
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold mb-2">Current Tags:</h2>
-                <div className="flex flex-wrap gap-2">
-                  {currentImage.tags.map(tag => (
-                    <Badge key={tag} variant="secondary" className="text-sm">
-                      {tag}
-                      <button onClick={() => removeTag(tag)} className="ml-2 text-red-500">
-                        ×
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold mb-2">Image Metadata:</h2>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>Date: {currentImage.metadata.date}</div>
-                  <div>Time: {currentImage.metadata.time}</div>
-                  <div>Location: {currentImage.metadata.location}</div>
-                  <div>Camera: {currentImage.metadata.camera}</div>
-                  <div>Lens: {currentImage.metadata.lens}</div>
-                  <div>ISO: {currentImage.metadata.iso}</div>
-                  <div>Aperture: {currentImage.metadata.aperture}</div>
-                  <div>Shutter Speed: {currentImage.metadata.shutterSpeed}</div>
-                </div>
-              </div>
-
-              <div className="flex justify-between mb-4">
-                <Button onClick={prevImage}>Previous Image</Button>
-                <Button onClick={nextImage}>Next Image</Button>
-              </div>
-            </>
+            <SingleView
+              currentImage={currentImage}
+              imageSize={imageSize}
+              setImageSize={setImageSize}
+              isImageFullScreen={isImageFullScreen}
+              setIsImageFullScreen={setIsImageFullScreen}
+              selectedImages={selectedImages}
+              toggleImageSelection={toggleImageSelection}
+              newTag={newTag}
+              setNewTag={setNewTag}
+              addTag={addTag}
+              removeTag={removeTag}
+              prevImage={prevImage}
+              nextImage={nextImage}
+            />
           ) : (
             <div className="text-center py-8">
               <p className="text-xl font-semibold">No images found</p>
@@ -617,73 +418,15 @@ export function FocalPoint() {
         </TabsContent>
         <TabsContent value="grid">
           {filteredImages.length > 0 ? (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-4">
-                {filteredImages
-                  .slice((currentPage - 1) * imagesPerPage, currentPage * imagesPerPage)
-                  .map((image) => (
-                    <MemoizedGridItem
-                      key={image.id}
-                      image={image}
-                      selectedImages={selectedImages}
-                      toggleImageSelection={toggleImageSelection}
-                      handleImageDoubleClick={handleImageDoubleClick}
-                    />
-                  ))}
-              </div>
-              <div className="flex justify-between items-center mt-4">
-                <Button 
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                >
-                  First
-                </Button>
-                <Button 
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  Previous
-                </Button>
-                <span>Page {currentPage} of {Math.ceil(filteredImages.length / imagesPerPage)}</span>
-                <Button 
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredImages.length / imagesPerPage)))}
-                  disabled={currentPage === Math.ceil(filteredImages.length / imagesPerPage)}
-                >
-                  Next
-                </Button>
-                <Button 
-                  onClick={() => setCurrentPage(Math.ceil(filteredImages.length / imagesPerPage))}
-                  disabled={currentPage === Math.ceil(filteredImages.length / imagesPerPage)}
-                >
-                  Last
-                </Button>
-              </div>
-              <div className="mt-4 flex justify-center items-center gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  max={Math.ceil(filteredImages.length / imagesPerPage)}
-                  value={currentPage}
-                  onChange={(e) => {
-                    const page = parseInt(e.target.value);
-                    if (page >= 1 && page <= Math.ceil(filteredImages.length / imagesPerPage)) {
-                      setCurrentPage(page);
-                    }
-                  }}
-                  className="w-20"
-                />
-                <span>of {Math.ceil(filteredImages.length / imagesPerPage)}</span>
-                <Button onClick={() => {
-                  const input = document.querySelector('input[type="number"]') as HTMLInputElement;
-                  const page = parseInt(input.value);
-                  if (page >= 1 && page <= Math.ceil(filteredImages.length / imagesPerPage)) {
-                    setCurrentPage(page);
-                  }
-                }}>
-                  Go
-                </Button>
-              </div>
-            </>
+            <GridView
+              filteredImages={filteredImages}
+              selectedImages={selectedImages}
+              toggleImageSelection={toggleImageSelection}
+              handleImageDoubleClick={handleImageDoubleClick}
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              imagesPerPage={imagesPerPage}
+            />
           ) : (
             <div className="text-center py-8">
               <p className="text-xl font-semibold">No images found</p>
@@ -693,19 +436,12 @@ export function FocalPoint() {
         </TabsContent>
       </Tabs>
 
-      <div className="flex gap-2 mb-4">
-        <Input
-          type="text"
-          value={bulkTag}
-          onChange={(e) => setBulkTag(e.target.value)}
-          placeholder="Bulk tag"
-          className="flex-grow"
-        />
-        <Button onClick={applyBulkTag} disabled={selectedImages.length === 0}>
-          <Tag className="mr-2 h-4 w-4" />
-          Apply to Selected ({selectedImages.length})
-        </Button>
-      </div>
+      <BulkTagging
+        bulkTag={bulkTag}
+        setBulkTag={setBulkTag}
+        applyBulkTag={applyBulkTag}
+        selectedImagesCount={selectedImages.length}
+      />
 
       <Button onClick={exportTagData} className="w-full">
         <Download className="mr-2 h-4 w-4" />
