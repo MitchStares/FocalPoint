@@ -28,6 +28,7 @@
     "cross-env": "^7.0.3",
     "electron": "^32.1.0",
     "electron-builder": "^25.0.5",
+    "exif-js-heic": "^2.3.0",
     "exifreader": "^4.23.5",
     "firebase": "^10.13.1",
     "lucide-react": "^0.441.0",

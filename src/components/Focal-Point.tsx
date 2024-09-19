@@ -24,6 +24,7 @@ import ImageNavigation from './ImageNavigation'
 import BulkTagging from './BulkTagging'
 import SingleView from './SingleView'
 import GridView from './GridView'
+import EXIF from 'exif-js-heic';
 
 declare global {
   interface Window {
@@ -40,6 +41,8 @@ declare global {
         iso: string;
         aperture: string;
         shutterSpeed: string;
+        width: number;
+        height: number;
       }>;
     }
   }
@@ -219,7 +222,7 @@ export function FocalPoint() {
         setLoadedImages(prev => prev + 1);
         return {
           id: index + 1,
-          url: base64, // This should already include the data:image/... prefix
+          url: base64,
           tags: [],
           metadata: {
             filename: file.name,
@@ -253,7 +256,7 @@ export function FocalPoint() {
         setLoadedImages(prev => prev + 1);
         return {
           id: index + 1,
-          url: `data:image/jpeg;base64,${base64}`, // Ensure this prefix is added only once
+          url: `data:image/jpeg;base64,${base64}`,
           tags: [],
           metadata: {
             filename: file,
@@ -282,19 +285,33 @@ export function FocalPoint() {
     });
   };
 
-  const getImageMetadata = async (file: File) => {
-    // In a web environment, we can't access the full EXIF data easily
-    // You might want to use a library like exif-js for more detailed metadata
-    return {
-      date: file.lastModified ? new Date(file.lastModified).toISOString() : 'Unknown',
-      time: file.lastModified ? new Date(file.lastModified).toTimeString().split(' ')[0] : 'Unknown',
-      location: 'Unknown',
-      camera: 'Unknown',
-      lens: 'Unknown',
-      iso: 'Unknown',
-      aperture: 'Unknown',
-      shutterSpeed: 'Unknown',
-    };
+  const getImageMetadata = async (file: File | string) => {
+    if (isElectron) {
+      // Electron version
+      const filePath = file as string;
+      return window.electron.getImageMetadata(filePath);
+    } else {
+      // Web version
+      return new Promise((resolve) => {
+        EXIF.getData(file as File, function(this: any) {
+          const metadata = {
+            date: EXIF.getTag(this, "DateTimeOriginal") || 'Unknown',
+            time: EXIF.getTag(this, "DateTimeOriginal")?.split(' ')[1] || 'Unknown',
+            location: EXIF.getTag(this, "GPSLatitude") && EXIF.getTag(this, "GPSLongitude")
+              ? `${EXIF.getTag(this, "GPSLatitude")}, ${EXIF.getTag(this, "GPSLongitude")}`
+              : 'Unknown',
+            camera: EXIF.getTag(this, "Model") || 'Unknown',
+            lens: EXIF.getTag(this, "LensModel") || 'Unknown',
+            iso: EXIF.getTag(this, "ISOSpeedRatings") || 'Unknown',
+            aperture: EXIF.getTag(this, "FNumber") || 'Unknown',
+            shutterSpeed: EXIF.getTag(this, "ExposureTime") || 'Unknown',
+            width: EXIF.getTag(this, "PixelXDimension") || 'Unknown',
+            height: EXIF.getTag(this, "PixelYDimension") || 'Unknown',
+          };
+          resolve(metadata);
+        });
+      });
+    }
   };
 
   const applyFilters = () => {
