@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,8 +22,9 @@ import { useTheme } from "next-themes"
 import CloudStorageDialog from './CloudStorageDialog'
 import { LoginComponent } from './LoginComponent'
 import { Slider } from "@/components/ui/slider"
-import { Image } from '@/types/image';
+import { Image } from '@/types/Image'
 import ImageLoadingProgress from './Image-Loading-Progress'
+import LazyImage from './LazyImage'
 
 declare global {
   interface Window {
@@ -44,6 +45,42 @@ declare global {
     }
   }
 }
+
+const MemoizedGridItem = React.memo(({ image, selectedImages, toggleImageSelection, handleImageDoubleClick }: {
+  image: Image;
+  selectedImages: number[];
+  toggleImageSelection: (id: number) => void;
+  handleImageDoubleClick: (id: number) => void;
+}) => (
+  <div className="relative">
+    <LazyImage
+      src={image.url}
+      alt={`Wildlife image ${image.id}`}
+      className="w-full h-auto rounded-lg shadow-lg cursor-pointer"
+      onDoubleClick={() => handleImageDoubleClick(image.id)}
+    />
+    <div className="absolute top-2 left-2 flex gap-2">
+      <Checkbox
+        checked={selectedImages.includes(image.id)}
+        onCheckedChange={() => toggleImageSelection(image.id)}
+      />
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => handleImageDoubleClick(image.id)}
+      >
+        View
+      </Button>
+    </div>
+    <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
+      {image.tags.map(tag => (
+        <Badge key={tag} variant="secondary" className="text-xs">
+          {tag}
+        </Badge>
+      ))}
+    </div>
+  </div>
+));
 
 export function FocalPoint() {
   const [images, setImages] = useState<Image[]>([]);
@@ -167,6 +204,26 @@ export function FocalPoint() {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
+  const isElectron = 'electron' in window;
+
+  const handleImageUpload = async () => {
+    if (isElectron) {
+      await loadLocalImages();
+    } else {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const files = (e.target as HTMLInputElement).files;
+        if (files) {
+          await processUploadedFiles(Array.from(files));
+        }
+      };
+      input.click();
+    }
+  };
+
   const loadLocalImages = async () => {
     try {
       const directory = await window.electron.openDirectory();
@@ -179,41 +236,101 @@ export function FocalPoint() {
           console.log('No image files found in the directory');
           return;
         }
-        setIsLoading(true);
-        setTotalImagesToLoad(files.length);
-        setLoadedImages(0);
-
-        const newImages = await Promise.all(files.map(async (file, index) => {
-          const filePath = `${directory}/${file}`;
-          console.log('Processing file:', filePath);
-          try {
-            const base64 = await window.electron.readFile(filePath);
-            const metadata = await window.electron.getImageMetadata(filePath);
-            setLoadedImages(prev => prev + 1);
-            return {
-              id: index + 1,
-              url: `data:image/jpeg;base64,${base64}`,
-              tags: [],
-              metadata: {
-                filename: file,
-                ...metadata
-              }
-            };
-          } catch (error) {
-            console.error('Error processing file:', filePath, error);
-            setLoadedImages(prev => prev + 1);
-            return null;
-          }
-        }));
-        const validImages = newImages.filter(img => img !== null);
-        setImages(validImages);
-        setFilteredImages(validImages);
+        await processFiles(files, directory);
       }
     } catch (error) {
       console.error('Error in loadLocalImages:', error);
-    } finally {
-      setIsLoading(false);
     }
+  };
+
+  const processUploadedFiles = async (files: File[]) => {
+    setIsLoading(true);
+    setTotalImagesToLoad(files.length);
+    setLoadedImages(0);
+
+    const newImages = await Promise.all(files.map(async (file, index) => {
+      try {
+        const base64 = await readFileAsBase64(file);
+        const metadata = await getImageMetadata(file);
+        setLoadedImages(prev => prev + 1);
+        return {
+          id: index + 1,
+          url: base64, // This should already include the data:image/... prefix
+          tags: [],
+          metadata: {
+            filename: file.name,
+            ...metadata
+          }
+        };
+      } catch (error) {
+        console.error('Error processing file:', file.name, error);
+        setLoadedImages(prev => prev + 1);
+        return null;
+      }
+    }));
+
+    const validImages = newImages.filter(img => img !== null) as Image[];
+    setImages(validImages);
+    setFilteredImages(validImages);
+    setIsLoading(false);
+  };
+
+  const processFiles = async (files: string[], directory: string) => {
+    setIsLoading(true);
+    setTotalImagesToLoad(files.length);
+    setLoadedImages(0);
+
+    const newImages = await Promise.all(files.map(async (file, index) => {
+      const filePath = `${directory}/${file}`;
+      console.log('Processing file:', filePath);
+      try {
+        const base64 = await window.electron.readFile(filePath);
+        const metadata = await window.electron.getImageMetadata(filePath);
+        setLoadedImages(prev => prev + 1);
+        return {
+          id: index + 1,
+          url: `data:image/jpeg;base64,${base64}`, // Ensure this prefix is added only once
+          tags: [],
+          metadata: {
+            filename: file,
+            ...metadata
+          }
+        };
+      } catch (error) {
+        console.error('Error processing file:', filePath, error);
+        setLoadedImages(prev => prev + 1);
+        return null;
+      }
+    }));
+
+    const validImages = newImages.filter(img => img !== null) as Image[];
+    setImages(validImages);
+    setFilteredImages(validImages);
+    setIsLoading(false);
+  };
+
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const getImageMetadata = async (file: File) => {
+    // In a web environment, we can't access the full EXIF data easily
+    // You might want to use a library like exif-js for more detailed metadata
+    return {
+      date: file.lastModified ? new Date(file.lastModified).toISOString() : 'Unknown',
+      time: file.lastModified ? new Date(file.lastModified).toTimeString().split(' ')[0] : 'Unknown',
+      location: 'Unknown',
+      camera: 'Unknown',
+      lens: 'Unknown',
+      iso: 'Unknown',
+      aperture: 'Unknown',
+      shutterSpeed: 'Unknown',
+    };
   };
 
   const applyFilters = () => {
@@ -278,6 +395,10 @@ export function FocalPoint() {
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={toggleTheme}>
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </Button>
+          <Button variant="outline" onClick={handleImageUpload}>
+            <Folder className="mr-2 h-4 w-4" />
+            {isElectron ? 'Load Local Images' : 'Upload Images'}
           </Button>
           <CloudStorageDialog />
           <LoginComponent />
@@ -501,34 +622,13 @@ export function FocalPoint() {
                 {filteredImages
                   .slice((currentPage - 1) * imagesPerPage, currentPage * imagesPerPage)
                   .map((image) => (
-                    <div key={image.id} className="relative">
-                      <img 
-                        src={image.url} 
-                        alt={`Wildlife image ${image.id}`} 
-                        className="w-full h-auto rounded-lg shadow-lg cursor-pointer"
-                        onDoubleClick={() => handleImageDoubleClick(image.id)}
-                      />
-                      <div className="absolute top-2 left-2 flex gap-2">
-                        <Checkbox
-                          checked={selectedImages.includes(image.id)}
-                          onCheckedChange={() => toggleImageSelection(image.id)}
-                        />
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleImageDoubleClick(image.id)}
-                        >
-                          View
-                        </Button>
-                      </div>
-                      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1">
-                        {image.tags.map(tag => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
+                    <MemoizedGridItem
+                      key={image.id}
+                      image={image}
+                      selectedImages={selectedImages}
+                      toggleImageSelection={toggleImageSelection}
+                      handleImageDoubleClick={handleImageDoubleClick}
+                    />
                   ))}
               </div>
               <div className="flex justify-between items-center mt-4">
@@ -573,7 +673,13 @@ export function FocalPoint() {
                   className="w-20"
                 />
                 <span>of {Math.ceil(filteredImages.length / imagesPerPage)}</span>
-                <Button onClick={() => setCurrentPage(parseInt((document.querySelector('input[type="number"]') as HTMLInputElement).value))}>
+                <Button onClick={() => {
+                  const input = document.querySelector('input[type="number"]') as HTMLInputElement;
+                  const page = parseInt(input.value);
+                  if (page >= 1 && page <= Math.ceil(filteredImages.length / imagesPerPage)) {
+                    setCurrentPage(page);
+                  }
+                }}>
                   Go
                 </Button>
               </div>
@@ -600,11 +706,6 @@ export function FocalPoint() {
           Apply to Selected ({selectedImages.length})
         </Button>
       </div>
-
-      <Button onClick={loadLocalImages} className="w-full mb-4">
-        <Folder className="mr-2 h-4 w-4" />
-        Load Local Images
-      </Button>
 
       <Button onClick={exportTagData} className="w-full">
         <Download className="mr-2 h-4 w-4" />
